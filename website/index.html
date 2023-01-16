@@ -7,6 +7,15 @@
                 height: 300px;
                 overflow-y: auto;
             }
+            .history > div {
+                border: 1px solid black;
+                width: 100%;
+                box-sizing: border-box;
+                height: 200px;
+            }
+            .history > div * {
+                height: 100%;
+            }
         </style>
         <script>
             function load(input) {
@@ -25,11 +34,11 @@
                     body: formData
                 })
                     .then(v=>{
-                        v.json()
+                        return v.json();
                     })
                     .then(v=>{
-                        console.log(v);
-                    })
+                        document.querySelector('.history').insertAdjacentHTML('afterbegin', '<div><img src="http://storage/image.php?id='+v['id']+'"></div>');
+                    });
             }
         </script>
         <title>Uploader test</title>
@@ -37,6 +46,8 @@
     <body>
         <input type="file" id="in">
         <button onclick="load(document.querySelector('#in'))">Upload</button>
-        <div class="history"></div>
+        <div class="history">
+            
+        </div>
     </body>
 </html>
