@@ -12,7 +12,6 @@
                 $dir = 'storage/'.$generated['path'];
                 $filename = $generated['file'].'.jpg';
 
-                echo $dir.$filename."\n";
                 @mkdir($dir, 0777, true);
 
                 if(@is_array(getimagesize($loaded))){
@@ -26,8 +25,8 @@
                 $moved = move_uploaded_file($loaded, $dir.$filename);
                 if(!$moved) return ['moved'=>false];
 
-                $this->database->request('INSERT INTO info (`path`, `original_filename`) VALUES (?, ?)', [$dir.$filename, '']);
-                return ['path' => $dir.$filename];
+                $insert = $this->database->request('INSERT INTO info (`path`, `original_filename`) VALUES (?, ?)', [$dir.$filename, '']);
+                return ['id' => $insert->lastInsertId()];
             }
             catch (Throwable $e) {
                 return ['thrown' => $e->__toString()];
