@@ -1,9 +1,9 @@
 <?php
     class Loader {
-        private int $lastUploadedId;
+        private Database $database;
 
-        function __construct() {
-            $this->lastUploadedId = 65000000000000-3;
+        function __construct(Database $database) {
+            $this->database = $database;
         }
 
         function load(string $loaded) : array {
@@ -26,6 +26,7 @@
                 $moved = move_uploaded_file($loaded, $dir.$filename);
                 if(!$moved) return ['moved'=>false];
 
+                $this->database->request('INSERT INTO info (`path`, `original_filename`) VALUES (?, ?)', [$dir.$filename, '']);
                 return ['path' => $dir.$filename];
             }
             catch (Throwable $e) {
@@ -33,8 +34,7 @@
             }
         }
         private function newPath() : array {
-            $this->lastUploadedId++;
-            return $this->generatePath($this->lastUploadedId);
+            return $this->generatePath($this->lastUploadedId() + 1);
         }
         private function generatePath(int $number, int $depth = 4, int $limit = 1000, string $path = '') : array {
             if($depth == 1) return ['path' => $path, 'file' => $this->generateString($number)];
@@ -48,5 +48,10 @@
              $string = $charset[$number % $charsetLength] . $string;
              $number = floor($number / $charsetLength);
              return $this->generateString($number, $charset, $string);
+        }
+        private function lastUploadedId() : int {
+            $requestResult = $this->database->request('SELECT id FROM info ORDER BY id DESC LIMIT 1');
+            if($requestResult->rowCount() == 0) return 0;
+            return $requestResult->response()[0]['id'];
         }
     }
