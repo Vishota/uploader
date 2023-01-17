@@ -1,18 +1,23 @@
 <?php
+    require_once __DIR__.'/_semaphores.php';
+    
     class Loader {
         private Database $database;
+        private $semaphore;
 
         function __construct(Database $database) {
+            $this->semaphore = sem_get(1);
             $this->database = $database;
         }
 
         function load(string $loaded) : array {
             try {
+                sem_acquire($this->semaphore);
+                
                 $generated = $this->newPath();
                 $dir = 'storage/'.$generated['path'];
                 $filename = $generated['file'].'.jpg';
 
-                @mkdir($dir, 0777, true);
 
                 if(@is_array(getimagesize($loaded))){
                     $image = true;
@@ -23,16 +28,18 @@
                 if(!$image) return ['image'=>false];
 
                 $moved = move_uploaded_file($loaded, $dir.$filename);
-                if(!$moved) return ['moved'=>false];
+                if(!$moved) return ['moved'=>false]; 
 
                 $insert = $this->database->request('INSERT INTO info (`path`, `original_filename`) VALUES (?, ?)', [$dir.$filename, '']);
+                sem_release($this->semaphore);
                 return ['id' => $insert->lastInsertId()];
             }
             catch (Throwable $e) {
+                sem_release($this->semaphore);
                 return ['thrown' => $e->__toString()];
             }
         }
-        private function newPath() : array {
+        private function newPadth() : array {
             return $this->generatePath($this->lastUploadedId() + 1);
         }
         private function generatePath(int $number, int $depth = 4, int $limit = 1000, string $path = '') : array {
