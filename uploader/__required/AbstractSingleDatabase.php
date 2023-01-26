@@ -4,11 +4,10 @@
 
     abstract class AbstractSingleDatabase extends Database {
         use SingletonTrait;
-        // $database, $user, $password, $host must be overriden
         protected function __init() {
             $this->initConnectionData();
             $this->connect();
         }
+        // setConnectionData(..) must be used in initConnectionData in child class
         abstract function initConnectionData();
-        // setConnectionData(..) must be used in initConnectionData
     }

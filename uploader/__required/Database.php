@@ -1,7 +1,8 @@
 <?php
     require_once __DIR__.'/DatabaseRequestResult.php';
+    require_once __DIR__.'/DatabaseInterface.php';
 
-    class Database {
+    class Database implements DatabaseInterface {
         private PDO $dbh;
         private string $database, $user, $password, $host;
         function __construct(string $database, string $user, string $password, string $host = 'localhost') {
