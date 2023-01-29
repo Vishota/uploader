@@ -20,11 +20,17 @@ final class StorageRunner extends AbstractRunner {
             exit(0);
         }
 
+        require_once  __DIR__."/../__required/_semaphores.php";
         spl_autoload_register(function (string $class) {
-            require_once  __DIR__."/../__required/_semaphores.php";
-            include_once __DIR__."/../__required/$class.php";
-            include_once __DIR__."/../runnable/$class.php";
-            include_once __DIR__."/$class.php";
+            if (file_exists(__DIR__ . "/../__required/$class.php")) {
+                include_once __DIR__ . "/../__required/$class.php";
+            }
+            if (file_exists(__DIR__."/../runnable/$class.php")) {
+                include_once __DIR__ . __DIR__."/../runnable/$class.php";
+            }
+            if (file_exists(__DIR__."/$class.php")) {
+                include_once __DIR__."/$class.php";
+            }
         });
     }
 }

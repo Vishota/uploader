@@ -14,12 +14,14 @@ final class FilesManager {
         UPLOAD_ERR_CANT_WRITE => 'UPLOAD_ERR_CANT_WRITE',
         UPLOAD_ERR_EXTENSION => 'UPLOAD_ERR_EXTENSION'
     ];
-    const IMAGE_MAX_SIZE_PX = 1000;
-    const IMAGE_MAX_SIZE_B = 200 * 1024;
-    const IMAGE_DEFAULT_QUALITY = 50;
+    private const IMAGE_MAX_SIZE_PX = 1000;
+    private const IMAGE_MAX_SIZE_B = 250 * 1024;
+    private const IMAGE_DEFAULT_QUALITY = 50;
+    private static $storage_root;
     function __construct() {
         $this->factory = StorageFactory::getInstance();
         $this->database = $this->factory->getDatabase();
+        self::$storage_root = $_SERVER['DOCUMENT_ROOT'] . '/storage/';
     }
     /**$file = $_FILE['filename']:
      *  'name'
@@ -61,11 +63,12 @@ final class FilesManager {
                 return $result;
             }
 
-            if($this->addToDatabase($file, $generatedPath['directory'].$generatedPath['filename']) == false) {
+            $id = $this->addToDatabase($file, $generatedPath['directory'] . $generatedPath['filename']);
+            if($id == false) {
                 $result['status'] = 'NOT_ADDED_TO_DB';
                 return $result;
             }
-
+            $result['id'] = $id;
         }
         catch (Exception $e) {
             $result['status'] = -1;
@@ -92,13 +95,32 @@ final class FilesManager {
      * converts and moves file
      */
     private function moveFile (string $tmpPath, array $generatedPath): bool {
-        @mkdir($generatedPath['directory'], 0777, true);
         $this->compressAndMoveImage($tmpPath, $generatedPath, self::IMAGE_DEFAULT_QUALITY, self::IMAGE_MAX_SIZE_PX);
         return true;
         //return move_uploaded_file($tmpPath, $generatedPath['directory'].$generatedPath['file']);
     }
-    private function compressAndMoveImage(string $tmpPath, array $generatedPath, int $quality, int $maxsize) {
-        $imagetype = exif_imagetype($tmpPath);
+    private function compressAndMoveImage(string $tmpPath, array $generatedPath, int $quality, int $maxsizePx) {
+        $origin = imagecreatefromstring(file_get_contents($tmpPath));
+        $dir = self::$storage_root . $generatedPath['directory'];
+        $file = $dir . $generatedPath['filename'] . '.webp';
+        @mkdir($dir, 0777, true);
+
+        list($origWidth, $origHeight) = getimagesize($tmpPath);
+        $resizeCoeff = 1;
+        if($origWidth > $maxsizePx || $origHeight > $maxsizePx) {
+            $resizeCoeff = $maxsizePx / max($origWidth, $origHeight);
+        }
+        $newWidth = ceil($origWidth * $resizeCoeff);
+        $newHeight = ceil($origHeight * $resizeCoeff);
+        $compressed = imagecreatetruecolor($newWidth, $newHeight);
+
+        imagecopyresampled($compressed, $origin, 0, 0, 0, 0, $origWidth * $resizeCoeff, $origHeight * $resizeCoeff, $origWidth, $origHeight);
+        imagewebp($compressed, $file, $quality);
+        
+        if (filesize($file) > self::IMAGE_MAX_SIZE_B && $quality != 0) {
+            $this->compressAndMoveImage($tmpPath, $generatedPath, max(0, $quality - 10), $maxsizePx);
+        }
+        /*$imagetype = exif_imagetype($tmpPath);
         switch($imagetype) {
             case IMAGETYPE_GIF:
                 imagewebp(imagecreatefromgif($tmpPath), $generatedPath['directory'].$generatedPath['filename'].'.webp', $quality);
@@ -122,11 +144,14 @@ final class FilesManager {
                 }
                 break;
             default: return false;
-        }
+        }*/
     }
-    private function addToDatabase (array $file, string $fullPath): bool {
+    /**
+     * returns id or false
+     */
+    private function addToDatabase (array $file, string $fullPath) {
         $result = $this->database->request('INSERT INTO files (`original_name`, `path`, `size`, `is_image`, `is_text`) VALUES (?,?,?,?,?)', [substr($file['name'], 100), $fullPath, $file['size'], 1, 0 ]);
-        return $result->rowCount();
+        return $result->rowCount() == 0 ? false : $result->lastInsertId();
     }
 
     /**
