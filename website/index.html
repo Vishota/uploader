@@ -25,7 +25,7 @@
                 let formData = new FormData();
                 formData.append('file', file);
 
-                fetch('http://storage/upload.php', {
+                fetch('http://storage/api/upload.php', {
                     mode: 'cors',
                     method: 'post',
                     headers: {

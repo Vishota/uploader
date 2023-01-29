@@ -1,6 +1,6 @@
 <?php
     require_once __DIR__.'/Database.php';
-    require_once __DIR__.'/../Common/SingletonTrait.php';
+    require_once __DIR__.'/SingletonTrait.php';
 
     abstract class AbstractSingleDatabase extends Database {
         use SingletonTrait;
