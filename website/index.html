@@ -37,7 +37,7 @@
                         return v.json();
                     })
                     .then(v=>{
-                        document.querySelector('.history').insertAdjacentHTML('afterbegin', '<div><img src="http://storage/image.php?id='+v['id']+'"></div>');
+                        document.querySelector('.history').insertAdjacentHTML('afterbegin', '<div><img src="http://storage/api/image.php?id='+v['id']+'"></div>');
                     });
             }
         </script>

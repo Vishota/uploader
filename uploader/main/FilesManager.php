@@ -15,7 +15,7 @@ final class FilesManager {
         UPLOAD_ERR_EXTENSION => 'UPLOAD_ERR_EXTENSION'
     ];
     private const IMAGE_MAX_SIZE_PX = 1000;
-    private const IMAGE_MAX_SIZE_B = 250 * 1024;
+    private const IMAGE_MAX_SIZE_B = 400 * 1024;
     private const IMAGE_DEFAULT_QUALITY = 50;
     private static $storage_root;
     function __construct() {
@@ -57,13 +57,14 @@ final class FilesManager {
 
             // generating path 
             $generatedPath = $this->generateNextFilePath();
+            $finalPath = $this->moveFile($file['tmp_name'], $generatedPath);
             // 2-3. compressing & moving
-            if($this->moveFile($file['tmp_name'], $generatedPath) == false) {
+            if($finalPath == false) {
                 $result['status'] = 'NOT_MOVED';
                 return $result;
             }
 
-            $id = $this->addToDatabase($file, $generatedPath['directory'] . $generatedPath['filename']);
+            $id = $this->addToDatabase($file, $finalPath);
             if($id == false) {
                 $result['status'] = 'NOT_ADDED_TO_DB';
                 return $result;
@@ -77,6 +78,12 @@ final class FilesManager {
             sem_release(sem_get(1));
         }
         return $result;
+    }
+    public function readFile(int $id): string {
+        $requestResult = $this->database->request('SELECT path, is_accessible FROM files WHERE id=?', [$id]);
+        if($requestResult->rowCount() == 0) return 'NOFILE';
+        if($requestResult->response()[0]['is_accessible'] == false) return 'BANNED';
+        return file_get_contents($requestResult->response()[0]['path']);
     }
     
     /**
@@ -93,12 +100,15 @@ final class FilesManager {
     }
     /**
      * converts and moves file
+     * returns string filepath or false if failed
      */
-    private function moveFile (string $tmpPath, array $generatedPath): bool {
-        $this->compressAndMoveImage($tmpPath, $generatedPath, self::IMAGE_DEFAULT_QUALITY, self::IMAGE_MAX_SIZE_PX);
-        return true;
-        //return move_uploaded_file($tmpPath, $generatedPath['directory'].$generatedPath['file']);
+    private function moveFile (string $tmpPath, array $generatedPath) {
+        // if it will be possible to upload non-image files there will be check if file image or something else; now users can upload images only
+        return $this->compressAndMoveImage($tmpPath, $generatedPath, self::IMAGE_DEFAULT_QUALITY, self::IMAGE_MAX_SIZE_PX);
     }
+    /**
+     * @return string filepath or false
+     */
     private function compressAndMoveImage(string $tmpPath, array $generatedPath, int $quality, int $maxsizePx) {
         $origin = imagecreatefromstring(file_get_contents($tmpPath));
         $dir = self::$storage_root . $generatedPath['directory'];
@@ -120,32 +130,10 @@ final class FilesManager {
         if (filesize($file) > self::IMAGE_MAX_SIZE_B && $quality != 0) {
             $this->compressAndMoveImage($tmpPath, $generatedPath, max(0, $quality - 10), $maxsizePx);
         }
-        /*$imagetype = exif_imagetype($tmpPath);
-        switch($imagetype) {
-            case IMAGETYPE_GIF:
-                imagewebp(imagecreatefromgif($tmpPath), $generatedPath['directory'].$generatedPath['filename'].'.webp', $quality);
-                break;
-            case IMAGETYPE_JPEG:
-                $origin = imagecreatefromjpeg($tmpPath);
-                list($origWidth, $origHeight) = getimagesize($tmpPath);
-                $resizeCoeff = 1;
-                if($origWidth > $maxsize || $origHeight > $maxsize) {
-                    $resizeCoeff = $maxsize / max($origWidth, $origHeight);
-                }
-                $newWidth = ceil($origWidth * $resizeCoeff);
-                $newHeight = ceil($origHeight * $resizeCoeff);
-                $compressed = imagecreatetruecolor($newWidth, $newHeight);
-                imagecopyresampled($compressed, $origin, 0, 0, 0, 0, $origWidth * $resizeCoeff, $origHeight * $resizeCoeff, $origWidth, $origHeight);
 
-                imagewebp($compressed, $generatedPath['directory'].$generatedPath['filename'].'.webp', $quality);
-
-                if (filesize($generatedPath['directory'] . $generatedPath['filename'] . '.webp') > self::IMAGE_MAX_SIZE_B && $quality != 0) {
-                    $this->compressAndMoveImage($tmpPath, $generatedPath, max(0, $quality - 10), $maxsize);
-                }
-                break;
-            default: return false;
-        }*/
+        return $file;
     }
+    
     /**
      * returns id or false
      */
@@ -155,10 +143,7 @@ final class FilesManager {
     }
 
     /**
-     * [
-     * 'directory'=>string
-     * 'filename'=>string
-     * ]
+     * returns [ 'directory'=>string, 'filename'=>string ]
      */
     private function generateNextFilePath(): array {
         return FilePathGenerator::getInstance()->generatePath($this->getNextFileId());

@@ -1,11 +1,12 @@
 <?php
-require_once __DIR__.'/../runnable/RunUpload.php';
+require_once __DIR__.'/../runnable/RunGetFile.php';
 require_once __DIR__.'/../main/StorageRunner.php';
 /** this will be used to get (download) file
  * input:
  *  GET
- *   id = file id
+ *   id = image id
  * output:
- *  file
+ *  image
  */
-StorageRunner::getInstance()->run(RunUpload::getInstance());
+header('Content-Disposition: attachment; filename="vishotapic'.$_GET['id'].'.webp"');
+StorageRunner::getInstance()->run(new RunGetFile());
